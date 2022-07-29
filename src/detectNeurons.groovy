@@ -177,7 +177,7 @@ def saveNeuronsParameters(imgName, resultsFile, neurons, neuronIDMax, background
             cytoplasmMean /= nbNeuronRois
 
             //Neuron - nucleus mean AF546 intensity
-            def results = imgName + '\t' + id + '\t' + slices.min() + '\t' + slices.max() + '\t' + bgMean + '\t' + neuronMean + '\t' + nucleusMean + '\t' + cytoplasmMean + '\n'
+            def results = imgName + '\t' + id + '\t' + (int)slices.min() + '\t' + (int)slices.max() + '\t' + bgMean + '\t' + neuronMean + '\t' + nucleusMean + '\t' + cytoplasmMean + '\n'
             resultsFile << results
         }
     }
@@ -233,14 +233,14 @@ for (entry in project.getImageList()) {
     runPlugin('qupath.lib.algorithms.IntensityFeaturesPlugin', '{"pixelSizeMicrons": 2.0,  "region": "ROI",  "tileSizeMicrons": 25.0,  "channel1": true,  ' +
             '"channel2": true,  "channel3": true, "doMean": true,  "doStdDev": false,  "doMinMax": false,  "doMedian": false,  "doHaralick": false}')
 
-    println '--------- Detection of neurons ---------'
+    println '--------- Detecting neurons ---------'
     deselectAll()
     selectObjects(rois)
     cellposeNeurons.detectObjects(imageData, getSelectedObjects())
     def neurons = sortDetectionsBySlice(getDetectionObjects(), server.nZSlices())
     def neuronIDMax = stitch3D(neurons)
 
-    println '--------- Detection of nuclei ---------'
+    println '--------- Detecting nuclei ---------'
     deselectAll()
     selectObjects(rois)
     cellposeNuclei.detectObjects(imageData, getSelectedObjects())
