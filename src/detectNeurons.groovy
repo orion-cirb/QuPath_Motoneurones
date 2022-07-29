@@ -18,7 +18,7 @@ def resultsDir = buildFilePath(imageDir, '/Results')
 if (!fileExists(resultsDir)) mkdirs(resultsDir)
 def resultsFile = new File(buildFilePath(resultsDir, 'Results.csv'))
 resultsFile.createNewFile()
-def resHeaders = 'Image name\tNeuron ID\tStart slice\tStop slice\tBackground mean AF546 intensity\tNeuron mean AF546 intensity\tNucleus mean AF546 intensity\tCytoplasm mean AF546 intensity\n'
+def resHeaders = 'Image name\tNeuron ID\tStart slice\tStop slice\tVolume (um^3)\tBackground mean AF546 intensity\tNeuron mean AF546 intensity\tNucleus mean AF546 intensity\tCytoplasm mean AF546 intensity\n'
 resultsFile.write(resHeaders)
 
 // Build CellPose models
@@ -142,7 +142,7 @@ def getNeuronsWithNuclei(neurons, neuronIDMax) {
 }
 
 // Get mean intensity of a population of objects
-def saveNeuronsParameters(imgName, resultsFile, neurons, neuronIDMax, backgrounds) {
+def saveNeuronsParameters(imgName, resultsFile, neurons, neuronIDMax, backgrounds, pixelCal) {
     def toMeasure = 'AF546-T1: Mean'
 
     for(def id = 0; id < neuronIDMax; id++) {
@@ -152,6 +152,7 @@ def saveNeuronsParameters(imgName, resultsFile, neurons, neuronIDMax, background
             def slices = []
             def bgMean = 0
             def neuronMean = 0
+            def neuronVolume = 0
             def nucleusMean = 0
             def nbNucleusRois = 0
             def cytoplasmMean = 0
@@ -160,8 +161,12 @@ def saveNeuronsParameters(imgName, resultsFile, neurons, neuronIDMax, background
                 def bg = backgrounds[n.getMeasurementList().getMeasurementValue('Z slice')].getMeasurementList().getMeasurementValue('ROI: 2.00 µm per pixel: ' + toMeasure)
                 bgMean += bg
                 neuronMean += n.getMeasurementList().getMeasurementValue(toMeasure) - bg
-                def cytoplasmSum = n.getMeasurementList().getMeasurementValue(toMeasure) * n.getMeasurementList().getMeasurementValue('Area µm^2')
-                def areaCytoplasm = n.getMeasurementList().getMeasurementValue('Area µm^2')
+
+                def area = n.getMeasurementList().getMeasurementValue('Area µm^2')
+                neuronVolume += area * pixelCal.ZSpacingMicrons
+                def cytoplasmSum = n.getMeasurementList().getMeasurementValue(toMeasure) * area
+                def areaCytoplasm = area
+
                 if (n.hasChildren()) {
                     def nucleus = n.getChildObjects()[0]
                     nucleusMean += nucleus.getMeasurementList().getMeasurementValue(toMeasure) - bg
@@ -177,7 +182,7 @@ def saveNeuronsParameters(imgName, resultsFile, neurons, neuronIDMax, background
             cytoplasmMean /= nbNeuronRois
 
             //Neuron - nucleus mean AF546 intensity
-            def results = imgName + '\t' + id + '\t' + (int)slices.min() + '\t' + (int)slices.max() + '\t' + bgMean + '\t' + neuronMean + '\t' + nucleusMean + '\t' + cytoplasmMean + '\n'
+            def results = imgName + '\t' + id + '\t' + (int)slices.min() + '\t' + (int)slices.max() + '\t' + neuronVolume + '\t' + bgMean + '\t' + neuronMean + '\t' + nucleusMean + '\t' + cytoplasmMean + '\n'
             resultsFile << results
         }
     }
@@ -198,7 +203,6 @@ for (entry in project.getImageList()) {
     def imageData = entry.readImageData()
     def server = imageData.getServer()
     def cal = server.getPixelCalibration()
-    def pixelWidth = cal.getPixelWidth().doubleValue()
     def imgName = entry.getImageName()
     println ''
     println ''
@@ -248,7 +252,7 @@ for (entry in project.getImageList()) {
     def filteredNuclei = getNucleiInNeurons(nuclei, neurons)
     def filteredNeurons = getNeuronsWithNuclei(neurons, neuronIDMax)
 
-    saveNeuronsParameters(imgName, resultsFile, filteredNeurons, neuronIDMax, backgrounds)
+    saveNeuronsParameters(imgName, resultsFile, filteredNeurons, neuronIDMax, backgrounds, cal)
     selectObjects(backgrounds)
     clearSelectedObjects()
     clearDetections()
